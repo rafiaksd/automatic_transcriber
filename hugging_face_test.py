@@ -3,8 +3,8 @@ from transformers import pipeline
 # Initialize the translation pipeline with the "facebook/hf-seamless-m4t-large" model
 translation_pipeline = pipeline(
     task="translation", 
-    model="Qwen/Qwen2.5-7B", 
-    device=0  # Set to 0 for GPU or -1 for CPU
+    model="meta-llama/Llama-3.1-8B", 
+    device=-1  # Set to 0 for GPU or -1 for CPU
 )
 
 # Arabic text to translate
