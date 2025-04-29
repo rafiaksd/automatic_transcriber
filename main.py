@@ -3,7 +3,8 @@ import tkinter as tk
 from tkinter import filedialog, simpledialog
 import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
-import time
+import time, os
+from pydub import AudioSegment
 
 super_time_start = time.time()
 
@@ -28,23 +29,18 @@ def convert_mp4_to_mp3(input_file, folder_to_save):
 uni_folder_name = 'Media/'
 inner_audio_folder = 'Audio/'
 
-# Function to transcribe audio (MP3)
-def transcribe_audio(audio_file, audio_name):
-    # Initialize model and pipeline
-    torch.set_num_threads(6)  # Set to 8 threads for CPU
-
+def transcribe_audio(audio_file, audio_name, chunk_length_ms=30000, overlap_ms=2000):
+    # Setup
+    torch.set_num_threads(6)
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
     model_id = "openai/whisper-large-v3-turbo"
-
     model = AutoModelForSpeechSeq2Seq.from_pretrained(
         model_id, torch_dtype=torch_dtype, low_cpu_mem_usage=True, use_safetensors=True
-    )
-    model.to(device)
+    ).to(device)
 
     processor = AutoProcessor.from_pretrained(model_id)
-
     pipe = pipeline(
         "automatic-speech-recognition",
         model=model,
@@ -52,30 +48,48 @@ def transcribe_audio(audio_file, audio_name):
         feature_extractor=processor.feature_extractor,
         torch_dtype=torch_dtype,
         device=device,
-        generate_kwargs={"return_timestamps": True},
+        #generate_kwargs={"return_timestamps": True},
     )
 
+    # Load and split audio with overlap
+    print("\n▶️▶️▶️   Loading and splitting audio with overlap...")
+    audio = AudioSegment.from_file(audio_file)
+    step = chunk_length_ms - overlap_ms
+    chunks = []
+
+    for i in range(0, len(audio), step):
+        chunk = audio[i:i + chunk_length_ms]
+        chunks.append(chunk)
+
+    transcriptions = []
     start = time.time()
-    print('\n▶️▶️▶️ started audio parsing...')
-    result = pipe(audio_file)
+
+    for idx, chunk in enumerate(chunks):
+        chunk_path = f"temp_chunk_{idx}.wav"
+        chunk.export(chunk_path, format="wav")
+
+        print(f"✂️📝 Transcribe Chunk {idx + 1}/{len(chunks)}... ", end="", flush=True)
+        result = pipe(chunk_path)
+        print(f"⏰ {(time.time()-start):.2f}s")
+        
+        transcriptions.append(result["text"])
+
+        os.remove(chunk_path)  # Clean up
+
+    # You may later deduplicate or smooth overlaps if needed.
+    full_transcription = " ".join(transcriptions)
+
     time_took = time.time() - start
+    estimated_token = len(full_transcription.split()) * 1.3
+    print(f"\n⏰ Done in {time_took:.2f}s | Estimated tokens: {estimated_token:.0f} | ⚡ {estimated_token / time_took:.2f}/s")
 
-    #print(f"🧐🧐🧐 The RESULT: {result}")
-    transcription = result["text"]
-    estimated_token = len(transcription.split(' '))*1.3
+    # Save output
+    output_path = f"{uni_folder_name}{audio_name}.txt"
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(full_transcription)
 
-    print(f"\n⏰⏰ Time took: {time_took:.2f}s | Tokens: {estimated_token:.0f} | ⚡ Token Speed: {estimated_token/time_took:.2f}/s")
-
-    # Create a text file with the audio file name (without the extension)
-    text_file_name = f"{uni_folder_name}{audio_name}.txt"
-
-    # Save only the transcription to the text file
-    with open(text_file_name, "w", encoding="utf-8") as file:
-        file.write(transcription)
-
-    print(f"💾💾💾 Transcription saved to {text_file_name}")
-
-    return (transcription, audio_name)
+    print(f"💾 Saved transcription to {output_path}")
+    return full_transcription, audio_name
 
 # Set up tkinter root window (hidden)
 root = tk.Tk()
@@ -125,7 +139,7 @@ if len(transcribed_arabic_text) < 5:
     raise ValueError("💀💀💀 No transcription happened, exiting...")
 
 model_name = sys.argv[1] if len(sys.argv) > 1 else None
-model = model_name or "qwen2.5:7b-instruct" #qwen2.5:14b-instruct-q3_K_M
+model = model_name or "qwen2.5:7b-instruct" #qwen2.5:7b-instruct, qwen2.5:14b-instruct-q3_K_M, qwen2.5:7b-instruct-q3_K_M
 print(f"🧮🧮🧮 Using model: {model}")
 
 import requests
