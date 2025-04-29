@@ -1,11 +1,22 @@
-from transformers import pipeline
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+#BitsAndBytes needs NVIDIA for CUDA to run!
 
-# Initialize the translation pipeline with the "facebook/hf-seamless-m4t-large" model
-translation_pipeline = pipeline(
-    task="translation", 
-    model="meta-llama/Llama-3.1-8B", 
-    device=-1  # Set to 0 for GPU or -1 for CPU
+model_name = "Qwen/Qwen2.5-7B"
+
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_use_double_quant=True,
+    bnb_4bit_compute_dtype="float16" # Or "bfloat16" if supported
 )
+
+model = AutoModelForCausalLM.from_pretrained(
+    model_name,
+    quantization_config=bnb_config,
+    device_map="auto"
+)
+
+tokenizer = AutoTokenizer.from_pretrained(model_name)
 
 # Arabic text to translate
 arabic_text = """
@@ -19,8 +30,29 @@ arabic_text = """
 الله وتدبر القرآن إن رمت الهدى فالعلم تحت تتبر القرآن اتخاذ مكان واحد في البيت
 """
 
-# Translate from Arabic to English
-translated_text = translation_pipeline('translate arabic to english: ' + arabic_text)
+# Prepare your input
+prompt = "Translate Arabic to English: " + arabic_text
+messages = [
+    {"role": "system", "content": "You are Qwen, created by Alibaba Cloud. You are a helpful assistant."},
+    {"role": "user", "content": prompt}
+]
+text = tokenizer.apply_chat_template(
+    messages,
+    tokenize=False,
+    add_generation_prompt=True
+)
+model_inputs = tokenizer([text], return_tensors="pt").to(model.device)
 
-# Print the translated text
-print("Translated Text: ", translated_text[0]['translation_text'])
+# Generate text
+generated_ids = model.generate(
+    **model_inputs,
+    max_new_tokens=512,
+    do_sample=True,
+    top_p=0.8,
+    temperature=0.7,
+    repetition_penalty=1.05
+)
+generated_ids = [output_ids[len(input_ids):] for output_ids, input_ids in zip(generated_ids, model_inputs["input_ids"])]
+generated_text = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)
+
+print(generated_text)

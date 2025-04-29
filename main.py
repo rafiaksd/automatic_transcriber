@@ -31,10 +31,11 @@ inner_audio_folder = 'Audio/'
 # Function to transcribe audio (MP3)
 def transcribe_audio(audio_file, audio_name):
     # Initialize model and pipeline
-    #torch.set_num_threads(8)  # Set to 8 threads for CPU
+    torch.set_num_threads(6)  # Set to 8 threads for CPU
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+
     model_id = "openai/whisper-large-v3-turbo"
 
     model = AutoModelForSpeechSeq2Seq.from_pretrained(
@@ -61,9 +62,9 @@ def transcribe_audio(audio_file, audio_name):
 
     #print(f"🧐🧐🧐 The RESULT: {result}")
     transcription = result["text"]
-    estimated_token = len(transcription.split(' '))
+    estimated_token = len(transcription.split(' '))*1.3
 
-    print(f"\n⏰⏰ Time took: {time_took:.2f}s | Tokens: {estimated_token} | ⚡ Token Speed: {estimated_token/time_took:.2f}/s")
+    print(f"\n⏰⏰ Time took: {time_took:.2f}s | Tokens: {estimated_token:.0f} | ⚡ Token Speed: {estimated_token/time_took:.2f}/s")
 
     # Create a text file with the audio file name (without the extension)
     text_file_name = f"{uni_folder_name}{audio_name}.txt"
@@ -124,7 +125,7 @@ if len(transcribed_arabic_text) < 5:
     raise ValueError("💀💀💀 No transcription happened, exiting...")
 
 model_name = sys.argv[1] if len(sys.argv) > 1 else None
-model = model_name or "qwen2.5:7b" #qwen2.5:14b-instruct-q3_K_M
+model = model_name or "qwen2.5:7b-instruct" #qwen2.5:14b-instruct-q3_K_M
 print(f"🧮🧮🧮 Using model: {model}")
 
 import requests
@@ -138,7 +139,7 @@ def sanitize_model_name(model_name: str) -> str:
 output_file = f"{translate_file_name}_translation_{sanitize_model_name(model)}.txt"  # Define the output file name
 translation_folder = 'Translation/'
 
-instruction = """Translate the following Arabic subtitles into English, maintaining the original sentence order. Present the translation in standard paragraph form, without numbering. Whenever the phrase "peace be upon him" appears, replace it with "ﷺ". Whenever the word 'God' appears, replace it with "Allah". Ensure the English translation accurately reflects the meaning of the Arabic text while striving to preserve the sequence of the original sentences. The input may contain consecutive text segments that should be translated in order. End the translation after rendering all input.
+instruction = """Translate the following Arabic subtitles into English. Whenever the phrase "peace be upon him" appears, replace it with "ﷺ". Whenever the word 'God' appears, replace it with "Allah". End the translation after rendering all input.
 """
 
 #with open(f"Media/{file_to_read}", "r", encoding="utf-8") as file:
