@@ -1,33 +1,108 @@
-import subprocess
+import subprocess, time, os
 import tkinter as tk
 from tkinter import filedialog, simpledialog
 import torch
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
-import time, os
 from pydub import AudioSegment
+from pytubefix import YouTube
+from timerangebox import TimeRangeDialog
 
-super_time_start = time.time()
+def download_youtube_video():
+    link = simpledialog.askstring("YouTube Link", "Enter the YouTube video URL:")
+    if not link:
+        print("❌ No link provided.")
+        return None
+
+    try:
+        yt = YouTube(link)
+
+        # Try to get the 360p mp4 progressive stream
+        stream = yt.streams.filter(res="360p", file_extension='mp4', progressive=True).first()
+
+        # If 360p is not available, choose the highest resolution available
+        if not stream:
+            print("❌ 360p not available, selecting highest available resolution.")
+            stream = yt.streams.filter(file_extension='mp4', progressive=True).get_highest_resolution()
+
+        # Create folder if it doesn't exist
+        save_path = os.path.join("Media", "Youtube")
+        os.makedirs(save_path, exist_ok=True)
+
+        # Download the video
+        output_path = stream.download(output_path=save_path)
+        print(f"✅ Video downloaded: {output_path}")
+        return output_path
+
+    except Exception as e:
+        print(f"❌ Error downloading video 😱😱: {e}")
+        return None
 
 # Function to convert MP4 to MP3
 def convert_mp4_to_mp3(input_file, folder_to_save):
     output_name = simpledialog.askstring("Input", "Enter the name for the output MP3 file:")
-    
-    if output_name:
-        # Add .mp3 extension if not present
-        if not output_name.endswith(".mp3"):
-            output_name += ".mp3"
-        
-        # Run FFmpeg command to convert mp4 to mp3
-        subprocess.run(['ffmpeg', '-i', input_file, folder_to_save + output_name])
-        print(f"Converted {input_file} to {output_name}")
-        return folder_to_save + output_name
-    else:
+
+    if not output_name:
         print("No output name provided.")
         return None
+
+    if not output_name.endswith(".mp3"):
+        output_name += ".mp3"
+
+    # Ask whether to use a custom time range
+    use_custom_range = tk.messagebox.askyesno("Select Range", "Do you want to convert a custom time range?")
+
+    if use_custom_range:
+        try:
+            # Use the TimeRangeDialog instead of asking for raw input
+            root = tk.Tk()
+            root.withdraw()  # Hide the main root window
+            dialog = TimeRangeDialog(root)
+            root.destroy()   # Destroy the hidden root after dialog is closed
+
+            if not dialog.result:
+                print("❌ Time range selection was cancelled.")
+                return None
+
+            start_secs, end_secs = dialog.result
+            duration_secs = end_secs - start_secs
+            
+            # Convert to MP3
+            mp3_path = os.path.join(folder_to_save, output_name)
+            subprocess.run([
+                'ffmpeg', '-ss', str(start_secs), '-t', str(duration_secs), '-i', input_file,
+                '-loglevel', 'error', '-vn', mp3_path
+            ])
+            print(f"🟢 MP3 created for range {start_secs} - {end_secs}: {output_name}")
+
+            # Ask if user also wants the video
+            also_export_video = tk.messagebox.askyesno("Export Video", "Do you also want the MP4 video for that range?")
+            if also_export_video:
+                video_output_name = os.path.splitext(output_name)[0] + ".mp4"
+                video_path = os.path.join(folder_to_save, video_output_name)
+                subprocess.run([
+                    'ffmpeg', '-ss', str(start_secs), '-t', str(duration_secs), '-i', input_file,
+                    '-loglevel', 'error', '-c', 'copy', video_path
+                ])
+                print(f"🟢 MP4 video created: {video_output_name}")
+            
+            return mp3_path  # Return the audio path for transcription
+
+        except Exception as e:
+            print(f"❌ Invalid time range: {e}")
+            return None
+
+    else:
+        # Convert full MP4 to MP3
+        mp3_path = os.path.join(folder_to_save, output_name)
+        subprocess.run(['ffmpeg', '-i', input_file, '-loglevel', 'error', '-vn', mp3_path])
+        print(f"🟢 Full MP3 created: {output_name}")
+        return mp3_path
 
 # Folder to save media files
 uni_folder_name = 'Media/'
 inner_audio_folder = 'Audio/'
+
+super_time_start = time.time()
 
 def transcribe_audio(audio_file, audio_name, chunk_length_ms=30000, overlap_ms=2000):
     # Setup
@@ -62,15 +137,20 @@ def transcribe_audio(audio_file, audio_name, chunk_length_ms=30000, overlap_ms=2
         chunks.append(chunk)
 
     transcriptions = []
-    start = time.time()
+    transcribe_start_time = time.time()
 
     for idx, chunk in enumerate(chunks):
-        chunk_path = f"temp_chunk_{idx}.wav"
+        chunk_path = f"{uni_folder_name}TempChunk/temp_chunk_{idx}.wav"
         chunk.export(chunk_path, format="wav")
+        chunk_time = time.time()
 
         print(f"✂️📝 Transcribe Chunk {idx + 1}/{len(chunks)}... ", end="", flush=True)
         result = pipe(chunk_path)
-        print(f"⏰ {(time.time()-start):.2f}s")
+        chunk_done_time = time.time()
+        chunk_took_time = chunk_done_time - chunk_time
+        abs_took_time = chunk_done_time - transcribe_start_time
+
+        print(f"⏰ {abs_took_time:.2f}s ({chunk_took_time:.2f}s)")
         
         transcriptions.append(result["text"])
 
@@ -79,9 +159,9 @@ def transcribe_audio(audio_file, audio_name, chunk_length_ms=30000, overlap_ms=2
     # You may later deduplicate or smooth overlaps if needed.
     full_transcription = " ".join(transcriptions)
 
-    time_took = time.time() - start
+    time_took = time.time() - transcribe_start_time
     estimated_token = len(full_transcription.split()) * 1.3
-    print(f"\n⏰ Done in {time_took:.2f}s | Estimated tokens: {estimated_token:.0f} | ⚡ {estimated_token / time_took:.2f}/s")
+    print(f"\n⏰ Done in {time_took:.2f}s | Estimated Tokens: {estimated_token:.0f} | ⚡ Token Speed:{estimated_token / time_took:.2f}/s")
 
     # Save output
     output_path = f"{uni_folder_name}{audio_name}.txt"
@@ -96,29 +176,34 @@ root = tk.Tk()
 root.withdraw()  # Don't show the main window
 
 # Step 1: Open file dialog to select the audio or video file
-file_to_process = filedialog.askopenfilename(
-    title="Select an MP4 or MP3 file", 
-    filetypes=[("MP4 files", "*.mp4"), ("MP3 files", "*.mp3")]
-)
+file_to_process = None
+download_from_youtube = tk.messagebox.askyesno("YouTube", "Do you want to download a video from YouTube first?")
+
+if download_from_youtube:
+    file_to_process = download_youtube_video()
+else:
+    file_to_process = filedialog.askopenfilename(
+        title="Select an MP4 or MP3 file", 
+        filetypes=[("MP4 files", "*.mp4"), ("MP3 files", "*.mp3")]
+    )
 
 transcribed = ('', '')
 
 if file_to_process:
-    # Step 2: Check if the selected file is an MP4 or MP3
     file_extension = file_to_process.split('.')[-1].lower()
 
     if file_extension == "mp4":
-        converted_audio_dir = uni_folder_name + inner_audio_folder
+        converted_audio_dir = os.path.join(uni_folder_name, inner_audio_folder)
+        os.makedirs(converted_audio_dir, exist_ok=True)
         converted_to_mp3_file = convert_mp4_to_mp3(file_to_process, converted_audio_dir)
-        converted_file_name = converted_to_mp3_file.split('/')[-1].split('.')[0]
-        print(f"CONVERTED FILE 🔄🔄🔄: {converted_file_name}.mp3")
         if converted_to_mp3_file:
+            converted_file_name = os.path.splitext(os.path.basename(converted_to_mp3_file))[0]
             transcribed = transcribe_audio(converted_to_mp3_file, converted_file_name)
+
     elif file_extension == "mp3":
-        output_name = simpledialog.askstring("Input", "Enter the name for the TXT file:")
-        transcribed = transcribe_audio(file_to_process, output_name)
-else:
-    print("❌❌❌ No file selected")
+        file_name_only = os.path.splitext(os.path.basename(file_to_process))[0]
+        print(f'Selected {file_name_only}.mp3')
+        transcribed = transcribe_audio(file_to_process, file_name_only)
     
 
 print("FINISHED TRANSCRIBE! 💥💥💥")
@@ -130,7 +215,7 @@ print("FINISHED TRANSCRIBE! 💥💥💥")
 ###################################################
 ###################################################
 
-import sys
+import sys, time, json, re, os, requests
 
 translate_file_name = transcribed[1]
 transcribed_arabic_text = transcribed[0]
@@ -139,11 +224,8 @@ if len(transcribed_arabic_text) < 5:
     raise ValueError("💀💀💀 No transcription happened, exiting...")
 
 model_name = sys.argv[1] if len(sys.argv) > 1 else None
-model = model_name or "qwen2.5:7b-instruct" #qwen2.5:7b-instruct, qwen2.5:14b-instruct-q3_K_M, qwen2.5:7b-instruct-q3_K_M
+model = model_name or "qwen2.5:7b-instruct" #qwen2.5:7b-instruct, qwen2.5:14b-instruct-q3_K_M
 print(f"🧮🧮🧮 Using model: {model}")
-
-import requests
-import time, json, re, os
 
 def sanitize_model_name(model_name: str) -> str:
     sanitized = re.sub(r'[^a-zA-Z0-9]', '_', model_name)
@@ -178,7 +260,10 @@ def generate_streaming_response(own_prompt):
     return response
 
 start = time.time()
-print('\n💬📙📙 started streaming translation...')
+print('\n💬📙📙 Started Streaming Translation...')
+wait_start = time.time()
+streaming_response = generate_streaming_response(prompt)
+print(f"⏳ Delay to Start Translation: {time.time() - wait_start:.2f}s\n")
 streaming_response = generate_streaming_response(prompt)
 full_translation = ""  # Initialize an empty string to store the full translation
 
@@ -217,7 +302,7 @@ try:
     #finished
     super_time_end = time.time()
     super_time_took = super_time_end - super_time_start
-    print(f"🏆🏆🏆 FINISHED TRANSLATION 🏆🏆🏆 | TOTAL TIME : ⏱️⏱️⏱️ {super_time_took:.2f}s")
+    print(f"🏆🏆🏆 FINISHED TRANSLATION 🏆🏆🏆 | TOTAL TIME : ⏱️⏱️⏱️ {super_time_took:.2f}s\n")
 
     # 🔓 Open file in default editor (Notepad on Windows)
     cwd = os.getcwd()
