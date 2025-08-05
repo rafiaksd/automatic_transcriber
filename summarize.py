@@ -1,13 +1,14 @@
 import ollama
 
+model_ollama = "qwen3:1.7b"
 def summarize_text(text):
     """Summarizes text using the Llama 3 model."""
     response = ollama.chat(
-        model='llama3',
+        model=model_ollama,
         messages=[
             {
                 'role': 'user',
-                'content': f'Summarize this text: {text}',
+                'content': f'Summarize this text in simple language, in bullets, seperate into themes when needed: {text} /no_think',
             },
         ],
     )
