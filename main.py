@@ -224,7 +224,7 @@ if len(transcribed_arabic_text) < 5:
     raise ValueError("💀💀💀 No transcription happened, exiting...")
 
 model_name = sys.argv[1] if len(sys.argv) > 1 else None
-model = model_name or "qwen2.5:7b-instruct" #qwen2.5:7b-instruct, qwen2.5:14b-instruct-q3_K_M
+model = model_name or "qwen3:8b"
 print(f"🧮🧮🧮 Using model: {model}")
 
 def sanitize_model_name(model_name: str) -> str:
@@ -235,13 +235,16 @@ def sanitize_model_name(model_name: str) -> str:
 output_file = f"{translate_file_name}_translation_{sanitize_model_name(model)}.txt"  # Define the output file name
 translation_folder = 'Translation/'
 
-instruction = """Translate the following Arabic subtitles into English. Whenever the phrase "peace be upon him" appears, replace it with "ﷺ". Whenever the word 'God' appears, replace it with "Allah". End the translation after rendering all input.
-"""
+instruction = """Translate the following Arabic text to English only. Replace "peace be upon him" with "ﷺ" and "God" with "Allah". Do not add any explanations or reasoning—only return the translation./no_think"""
 
 #with open(f"Media/{file_to_read}", "r", encoding="utf-8") as file:
     #content = file.read()
 
 arabic_text = transcribed_arabic_text
+
+def chunk_text(text, max_words=800):
+    words = text.split()
+    return [" ".join(words[i:i + max_words]) for i in range(0, len(words), max_words)]
 
 prompt = instruction + arabic_text
 
@@ -259,38 +262,61 @@ def generate_streaming_response(own_prompt):
     )
     return response
 
-start = time.time()
-print('\n💬📙📙 Started Streaming Translation...')
-wait_start = time.time()
-streaming_response = generate_streaming_response(prompt)
-print(f"⏳ Delay to Start Translation: {time.time() - wait_start:.2f}s\n")
-streaming_response = generate_streaming_response(prompt)
-full_translation = ""  # Initialize an empty string to store the full translation
+def clean_text(text):
+    text = text.replace('<think>', '').replace('</think>', '')
+    text = re.sub(r'\n{3,}', '\n\n', text).strip()
+    return text
 
-# Check and print streaming result
-if streaming_response.status_code == 200:
-    print("Streaming Translation:📖📖\n")
-    try:
-        for line in streaming_response.iter_lines():
-            if line:
-                decoded_line = line.decode('utf-8')
-                try:
-                    json_data = json.loads(decoded_line)
-                    response_part = json_data.get('response', '')
-                    print(response_part, end='', flush=True)
-                    full_translation += response_part  # Append the current part to the full translation
-                except json.JSONDecodeError:
-                    print(f"Error decoding JSON: {decoded_line}")
-        print()  # Add a newline at the end of the stream
-    except requests.exceptions.RequestException as e:
-        print(f"Error during streaming: {e}")
-else:
-    print("Error:", streaming_response.status_code, streaming_response.text)
+# Chunk and translate
+chunks = chunk_text(arabic_text, max_words=200)
+print(f"\n🧩 Divided input into {len(chunks)} chunks...")
 
-time_took = time.time() - start
-token_speed = (len(full_translation.split(' ')))/time_took
+full_translation = ""
 
-print(f"\n⏰ Total time: {time_took:.2f}s | ⚡ Token Speed:{token_speed:.2f}/s")
+previous_chunk_tail = ""
+prev_chunk_context_length = 6
+
+abs_translation_start_time = time.time()
+
+for i, chunk in enumerate(chunks, 1):
+    chunk_start_time = time.time()
+    print(f"\n📦 Chunk {i}/{len(chunks)}", end="", flush=True)
+    prompt = instruction + previous_chunk_tail + chunk
+    wait_start = time.time()
+    streaming_response = generate_streaming_response(prompt)
+    print(f" ⏳ Chunk Start Time: {time.time() - wait_start:.2f}s\n")
+
+    if streaming_response.status_code == 200:
+        try:
+            for line in streaming_response.iter_lines():
+                if line:
+                    decoded_line = line.decode('utf-8')
+                    try:
+                        json_data = json.loads(decoded_line)
+                        response_part = json_data.get('response', '')
+                        print(response_part, end='', flush=True)
+                        full_translation += response_part
+                    except json.JSONDecodeError:
+                        print(f"\n❌ JSON Error: {decoded_line}")
+            chunk_done_time = time.time()
+            abs_chunk_time_took = chunk_done_time - abs_translation_start_time
+            chunk_time_took = chunk_done_time - chunk_start_time
+            # Add a newline after finishing a chunk
+            full_translation += "\n\n"
+
+            print(f'\n\n⏰⏰ {abs_chunk_time_took:.2f}s ({chunk_time_took:.2f})s')
+            previous_chunk_tail = ' '.join(chunk.split()[-prev_chunk_context_length:])  # Take last 20 words for context
+            print(f"PREV CHUNK🪡🪡🪡: {previous_chunk_tail}")
+        except requests.exceptions.RequestException as e:
+            print(f"\n❌ Streaming error: {e}")
+    else:
+        print("❌ Error:", streaming_response.status_code, streaming_response.text)
+
+full_translation = clean_text(full_translation)
+translation_time_took = time.time() - abs_translation_start_time
+token_speed = (len(full_translation.split(' ')))/translation_time_took
+
+print(f"\n⏰ Translation Total time: {translation_time_took:.2f}s | ⚡ Token Speed:{token_speed:.2f}/s")
 
 save_translation_file_name = translation_folder + output_file
 # Save the full translation to a file
