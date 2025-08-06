@@ -2,7 +2,7 @@ import yt_dlp
 import os, re, time, winsound, subprocess
 import ollama
 
-model_ollama = "qwen3:1.7b"
+model_ollama = "qwen3:8b"
 very_start_time = time.time()
 
 def get_time_lapsed(start_time, emojis="⏰⏱️"):
@@ -74,18 +74,15 @@ def summarize_text(text):
             {
                 'role': 'user',
                 'content': (
-                    "You're given a transcript of a YouTube video.\n\n"
                     "Your task is to summarize it in full sentences that are clear, engaging, and thoughtful.\n\n"
                     "Focus on:\n"
                     "- Identifying the key themes or sections of the video\n"
                     "- Summarizing the main ideas and insights under each theme\n"
                     "- Using powerful and clear language that stimulates the reader’s understanding\n"
-                    "- Writing in full sentences (not bullet points), structured in short paragraphs\n"
-                    "- Keeping it concise overall, but not overly brief — the goal is meaningful, digestible insight\n"
-                    "- Avoiding repetition and filler — keep every sentence valuable\n"
-                    "- Avoid quoting directly; rephrase in your own voice\n\n"
-                    "Make the summary feel like a thoughtful overview that helps the reader **truly learn something** from the video, even without watching it.\n\n"
-                    "Here is the transcript:\n"
+                    "- Writing in full sentences and structured in short paragraphs; absolutely do not use bullet points.\n"
+                    "- The goal is make the summary meaningful, digestible insight\n"
+                    "Make the summary feel like a thoughtful overview that helps the reader truly learn something even without reading it whole.\n\n"
+                    "Here is the text you have to summarize:\n"
                     f"{text}\n\n"
                     "/no_think"
                 ),
