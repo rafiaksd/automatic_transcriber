@@ -170,6 +170,6 @@ async def main():
     play_audio_and_wait(sound_file)
 
     #os.remove(sound_file)
-    #print(f"🗑️ Deleted {sound_file}")
+    #print(f"🗑️🗑️ Deleted {sound_file}")
 
 asyncio.run(main())
