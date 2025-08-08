@@ -75,17 +75,9 @@ def summarize_text(text):
             {
                 'role': 'user',
                 'content': (
-                    "Your task is to summarize it in full sentences that are clear, engaging, and thoughtful.\n\n"
-                    "Focus on:\n"
-                    "- Identifying the key themes or sections of the video\n"
-                    "- Summarizing the main ideas and insights under each theme\n"
-                    "- Using powerful and clear language that stimulates the reader’s understanding\n"
-                    "- Writing in full sentences and structured in short paragraphs; absolutely do not use bullet points.\n"
-                    "- The goal is make the summary meaningful, digestible insight\n"
-                    "Make the summary feel like a thoughtful overview that helps the reader truly learn something even without reading it whole.\n\n"
-                    "Here is the text you have to summarize:\n"
-                    f"{text}\n\n"
-                    "/no_think"
+                    "you are master extractor of important nuanced vital beneficial practical details, you stimulate the mind of geniuses, simply from simple information, then what about critical very well done information!\n"
+                    "your task is to summarize this text in moderate detail (not too much, but not too little), that will really challenge the brain, use simple language but make it challenging, yet a good learning\n\n"
+                    f"{text}"
                 ),
             },
         ],
@@ -126,3 +118,29 @@ get_time_lapsed(very_start_time, "🏁🏁🏁 TOTAL WORK")
 
 print(f"FINISHED")
 winsound.Beep(1000,1000)
+
+#####################
+## Text to Speech ###
+#####################
+
+with open(summarized_file, 'r', encoding='utf-8') as file:
+    text_to_generate = file.read()
+print(f"👀🎵 Opened {summarized_file} file for TTS")
+
+from kokoro import KPipeline
+import soundfile as sf
+
+pipeline = KPipeline(lang_code='a')
+
+#am_adam, am_fenrir, am_michael, am_puck, ... am_echo
+generator = pipeline(text_to_generate, voice='am_echo', speed=1.3)
+
+for i, (graphemes, phonemes, audio) in enumerate(generator):
+    sound_file = f'{i}.wav'
+    sf.write(sound_file, audio, 24000)
+    print(f"Audio saved to {i}.wav")
+
+    print(f"🎙️ Playing audio")
+    winsound.PlaySound(sound_file, winsound.SND_FILENAME) 
+
+    os.remove(sound_file)
