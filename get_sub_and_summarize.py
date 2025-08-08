@@ -68,7 +68,7 @@ def get_clean_subtitles(video_url: str) -> tuple[str, str, str]:
     return video_title, ' '.join(cleaned_text), f"{video_title}.txt"
 
 def summarize_text(text):
-    """Summarizes YouTube captions with depth, clarity, and engagement."""
+    """Summarizes YouTube captions with clarity and intellectual engagement."""
     response = ollama.chat(
         model=model_ollama,
         messages=[
@@ -76,7 +76,9 @@ def summarize_text(text):
                 'role': 'user',
                 'content': (
                     "you are master extractor of important nuanced vital beneficial practical details, you stimulate the mind of geniuses, simply from simple information, then what about critical very well done information!\n"
-                    "your task is to summarize this text in moderate detail (not too much, but not too little), that will really challenge the brain, use simple language but make it challenging, yet a good learning\n\n"
+                    "your task is to summarize this text in moderate detail (not too much, but not too little), that will really challenge the brain, use simple language but make it challenging, yet a good learning\n"
+                    "use easy to understand coherent full sentences and use simple but powerful language\n"
+                    "Do not include any questions, suggestions, or extra commentary—only return the summary.\n\n"
                     f"{text}"
                 ),
             },
@@ -103,6 +105,7 @@ get_time_lapsed(very_start_time, "🏁🏁🏁 SUBTITLE DOWNLOAD FINISHED")
 ## SUMMARIZE ###
 ################
 
+print(f"🧠🧠 Model using: {model_ollama}")
 print(f"🚩🚩 STARTING SUMMARIZING {title}")
 summarized_text = summarize_text(subtitles_text)
 
@@ -112,7 +115,6 @@ with open(f"summaries/{summarized_text_filename}", "w", encoding="utf-8") as f:
 print(f"\n✅ Subtitles saved to: {summarized_text_filename}")
 
 summarized_file = f"summaries/{summarized_text_filename}"
-subprocess.Popen(['notepad.exe', summarized_file])
 
 get_time_lapsed(very_start_time, "🏁🏁🏁 TOTAL WORK")
 
@@ -148,6 +150,11 @@ def sanitize_text_for_tts(text):
 def play_audio_and_wait(audio_path):
     pygame.mixer.init()
     pygame.mixer.music.load(audio_path)
+
+    winsound.PlaySound("success.wav", winsound.SND_FILENAME)
+    input("Press anything to play...")
+    
+    subprocess.Popen(['notepad.exe', summarized_file])
     pygame.mixer.music.play()
 
     # Wait until audio playback is done
@@ -163,10 +170,9 @@ text_to_generate = sanitize_text_for_tts(text_to_generate)
 async def main():
     sound_file = "edge_output.mp3"
 
-    tts = edge_tts.Communicate(text=text_to_generate, voice="en-US-GuyNeural", rate="+30%")
+    tts = edge_tts.Communicate(text=text_to_generate, voice="en-US-GuyNeural", rate="+5%")
     await tts.save(sound_file)
     print(f"✅ Saved {sound_file}")
-
     play_audio_and_wait(sound_file)
 
     #os.remove(sound_file)
