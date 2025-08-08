@@ -122,25 +122,54 @@ winsound.Beep(1000,1000)
 #####################
 ## Text to Speech ###
 #####################
+import edge_tts
+import asyncio, time, os, re
+import pygame
+
+def sanitize_text_for_tts(text):
+    # Replace smart quotes with plain quotes
+    text = text.replace('“', '"').replace('”', '"').replace("’", "'")
+
+    # Remove asterisks and dashes
+    text = re.sub(r'[\*\-]', '', text)
+
+    # Remove markdown-style headings (e.g. **Heading**)
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+
+    # Replace multiple spaces or newlines with single space or newline
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n\s*\n', '\n\n', text)
+
+    # Strip leading/trailing spaces
+    text = text.strip()
+
+    return text
+
+def play_audio_and_wait(audio_path):
+    pygame.mixer.init()
+    pygame.mixer.music.load(audio_path)
+    pygame.mixer.music.play()
+
+    # Wait until audio playback is done
+    while pygame.mixer.music.get_busy():
+        time.sleep(0.1)
+
+    pygame.mixer.quit()
 
 with open(summarized_file, 'r', encoding='utf-8') as file:
     text_to_generate = file.read()
-print(f"👀🎵 Opened {summarized_file} file for TTS")
+text_to_generate = sanitize_text_for_tts(text_to_generate)
 
-from kokoro import KPipeline
-import soundfile as sf
+async def main():
+    sound_file = "edge_output.mp3"
 
-pipeline = KPipeline(lang_code='a')
+    tts = edge_tts.Communicate(text=text_to_generate, voice="en-US-GuyNeural", rate="+30%")
+    await tts.save(sound_file)
+    print(f"✅ Saved {sound_file}")
 
-#am_adam, am_fenrir, am_michael, am_puck, ... am_echo
-generator = pipeline(text_to_generate, voice='am_echo', speed=1.3)
+    play_audio_and_wait(sound_file)
 
-for i, (graphemes, phonemes, audio) in enumerate(generator):
-    sound_file = f'{i}.wav'
-    sf.write(sound_file, audio, 24000)
-    print(f"Audio saved to {i}.wav")
+    #os.remove(sound_file)
+    #print(f"🗑️ Deleted {sound_file}")
 
-    print(f"🎙️ Playing audio")
-    winsound.PlaySound(sound_file, winsound.SND_FILENAME) 
-
-    os.remove(sound_file)
+asyncio.run(main())

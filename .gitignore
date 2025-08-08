@@ -4,3 +4,4 @@
 *.txt
 /subtitles/
 /summaries/
+/__pycache__/

@@ -1,6 +1,6 @@
-from kokoro import KPipeline
-import soundfile as sf
-import winsound, os, re
+import edge_tts
+import asyncio, time, os, re
+import pygame
 
 def sanitize_text_for_tts(text):
     # Replace smart quotes with plain quotes
@@ -21,22 +21,32 @@ def sanitize_text_for_tts(text):
 
     return text
 
-pipeline = KPipeline(lang_code='a')
+def play_audio_and_wait(audio_path):
+    pygame.mixer.init()
+    pygame.mixer.music.load(audio_path)
+    pygame.mixer.music.play()
+
+    # Wait until audio playback is done
+    while pygame.mixer.music.get_busy():
+        time.sleep(0.1)
+
+    pygame.mixer.quit()
 
 with open('text2.txt', 'r', encoding='utf-8') as file:
     text_to_generate = file.read()
 
 text_to_generate = sanitize_text_for_tts(text_to_generate)
 
-#am_adam, am_fenrir, am_michael, am_puck, ... am_echo, am_onyx
-generator = pipeline(text_to_generate, voice='am_onyx', speed=1.3)
+async def main():
+    sound_file = "edge_output.mp3"
 
-for i, (graphemes, phonemes, audio) in enumerate(generator):
-    sound_file = f'{i}.wav'
-    sf.write(sound_file, audio, 24000)
-    print(f"Audio saved to {sound_file}")
+    tts = edge_tts.Communicate(text=text_to_generate, voice="en-US-GuyNeural", rate="+30%")
+    await tts.save(sound_file)
+    print(f"✅ Saved {sound_file}")
 
-    print(f"🎙️ Playing audio")
-    winsound.PlaySound(sound_file, winsound.SND_FILENAME) 
+    play_audio_and_wait(sound_file)
 
     os.remove(sound_file)
+    print(f"🗑️ Deleted {sound_file}")
+
+asyncio.run(main())
