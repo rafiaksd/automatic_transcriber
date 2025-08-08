@@ -2,7 +2,8 @@ import yt_dlp
 import os, re, time, winsound, subprocess
 import ollama
 
-model_ollama = "qwen3:8b"
+model_ollama = "gemma3:4b"
+print(f"🧠🧠 Model using: {model_ollama}")
 very_start_time = time.time()
 
 def get_time_lapsed(start_time, emojis="⏰⏱️"):
