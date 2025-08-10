@@ -2,7 +2,7 @@ import yt_dlp
 import os, re, time, winsound, subprocess
 import ollama
 
-model_ollama = "gemma3:4b"
+model_ollama = "granite3.3:8b" #gpt-oss:20b #mistral:7b #granite3.3:8b
 print(f"🧠🧠 Model using: {model_ollama}")
 very_start_time = time.time()
 
@@ -68,17 +68,18 @@ def get_clean_subtitles(video_url: str) -> tuple[str, str, str]:
     return video_title, ' '.join(cleaned_text), f"{video_title}.txt"
 
 def summarize_text(text):
-    """Summarizes YouTube captions with clarity and intellectual engagement."""
+    """Summarizes YouTube captions with balanced clarity, depth, and simplicity."""
     response = ollama.chat(
         model=model_ollama,
         messages=[
             {
                 'role': 'user',
                 'content': (
-                    "you are master extractor of important nuanced vital beneficial practical details, you stimulate the mind of geniuses, simply from simple information, then what about critical very well done information!\n"
-                    "your task is to summarize this text in moderate detail (not too much, but not too little), that will really challenge the brain, use simple language but make it challenging, yet a good learning\n"
-                    "use easy to understand coherent full sentences and use simple but powerful language\n"
-                    "Do not include any questions, suggestions, or extra commentary—only return the summary.\n\n"
+                    "Summarize the following text in a way that is clear, easy to understand, and intellectually engaging.\n"
+                    "The summary should not be too short or overly concise. It should provide enough detail to carry depth and meaning, "
+                    "but still be easy to follow. Use complete sentences with simple, everyday words that a 10-year-old could understand — "
+                    "but craft it in a way that feels powerful, thoughtful, and mind-stimulating.\n"
+                    "Avoid fluff, avoid over-explaining, and avoid any questions, suggestions, or extra commentary. Just return the summary.\n\n"
                     f"{text}"
                 ),
             },
@@ -112,7 +113,7 @@ summarized_text = summarize_text(subtitles_text)
 summarized_text_filename = f"{title}_summarized.md"
 with open(f"summaries/{summarized_text_filename}", "w", encoding="utf-8") as f:
      f.write(summarized_text)
-print(f"\n✅ Subtitles saved to: {summarized_text_filename}")
+print(f"\n✅ SUMMARY saved to: {summarized_text_filename}")
 
 summarized_file = f"summaries/{summarized_text_filename}"
 
@@ -127,6 +128,8 @@ winsound.Beep(1000,1000)
 import edge_tts
 import asyncio, time, os, re
 import pygame
+
+tts_speed_change = 60
 
 def sanitize_text_for_tts(text):
     # Replace smart quotes with plain quotes
@@ -152,7 +155,7 @@ def play_audio_and_wait(audio_path):
     pygame.mixer.music.load(audio_path)
 
     winsound.PlaySound("success.wav", winsound.SND_FILENAME)
-    input("Press anything to play...")
+    input("👆👆👀 Press anything to play...")
     
     subprocess.Popen(['notepad.exe', summarized_file])
     pygame.mixer.music.play()
@@ -170,7 +173,8 @@ text_to_generate = sanitize_text_for_tts(text_to_generate)
 async def main():
     sound_file = "edge_output.mp3"
 
-    tts = edge_tts.Communicate(text=text_to_generate, voice="en-US-GuyNeural", rate="+5%")
+    tts = edge_tts.Communicate(text=text_to_generate, voice="en-US-GuyNeural", 
+                               rate=f"+{str(tts_speed_change)}%")
     await tts.save(sound_file)
     print(f"✅ Saved {sound_file}")
     play_audio_and_wait(sound_file)
