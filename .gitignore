@@ -1,3 +1,4 @@
+edge_output*
 /venv/
 /Media/
 /Translation/
@@ -5,3 +6,7 @@
 /subtitles/
 /summaries/
 /__pycache__/
+*.mp3
+*.3gp
+*.mp4
+/whisper-diarization/

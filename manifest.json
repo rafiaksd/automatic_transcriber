@@ -1,0 +1,10 @@
+{
+  "audio_filepath": "diarization_test.mp3",
+  "offset": 0,
+  "duration": null,
+  "label": "infer",
+  "text": "unknown",
+  "num_speakers": null,
+  "rttm_filepath": null,
+  "uem_filepath": null
+}

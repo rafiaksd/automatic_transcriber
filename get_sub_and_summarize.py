@@ -1,8 +1,9 @@
 import yt_dlp
 import os, re, time, winsound, subprocess
 import ollama
+from pyfiglet import Figlet
 
-model_ollama = "granite3.3:8b" #gpt-oss:20b #mistral:7b #granite3.3:8b
+model_ollama = "gemma3:4b" #gpt-oss:20b #mistral:7b #granite3.3:8b
 print(f"🧠🧠 Model using: {model_ollama}")
 very_start_time = time.time()
 
@@ -106,7 +107,10 @@ get_time_lapsed(very_start_time, "🏁🏁🏁 SUBTITLE DOWNLOAD FINISHED")
 ## SUMMARIZE ###
 ################
 
-print(f"🧠🧠 Model using: {model_ollama}")
+#print(f"🧠🧠 Model using: {model_ollama}")
+figlet_text = Figlet(font="ogre") #digital, ogre, puffy
+print(figlet_text.renderText(model_ollama))
+
 print(f"🚩🚩 STARTING SUMMARIZING {title}")
 summarized_text = summarize_text(subtitles_text)
 
